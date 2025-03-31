@@ -87,9 +87,9 @@ class StyleReconstructor:
         return style_features
         
     def reconstruct(self, iterations=500, output_path="style_output", 
-                    learning_rate=0.01, img_size=256, 
+                    learning_rate=0.01, img_size=224, 
                     optimizer_type="adam", lbfgs_max_iter=20, 
-                    use_style_init=False, init_noise_scale=0.1):
+                    use_style_init=False, init_noise_scale=0.1, tv_weight=0.001):
         """
         Reconstruct an image that matches the style of the input style image
         
@@ -97,11 +97,12 @@ class StyleReconstructor:
             iterations: Number of optimization iterations
             output_path: Directory to save outputs
             learning_rate: Learning rate for optimization
-            img_size: Size of the output image
+            img_size: Size of the output image (if using pure noise init)
             optimizer_type: Type of optimizer to use ('adam' or 'lbfgs')
             lbfgs_max_iter: Max iterations per step for LBFGS optimizer
             use_style_init: Whether to initialize with style image + noise
             init_noise_scale: Scale of noise for initialization
+            tv_weight: Weight for total variation loss (set to 0 to disable)
         """
         # Check that style image is set
         if self.style_img is None:
@@ -116,17 +117,19 @@ class StyleReconstructor:
         
         # Initialize image
         if use_style_init:
-            # Initialize with style image + noise
+            # Initialize with style image + noise for a better starting point
             generated = self.style_img.clone() + init_noise_scale * torch.randn_like(self.style_img, device=self.device)
             generated.requires_grad_(True)
         else:
-            # Initialize with noise
+            # Initialize with random noise
             generated = torch.rand(1, 3, img_size, img_size, requires_grad=True, device=self.device)
         
-        # Setup optimizer
+        # Setup optimizer based on type
         optimizer_type = optimizer_type.lower()
         if optimizer_type == "adam":
             optimizer = optim.Adam([generated], lr=learning_rate)
+            # Setup a learning rate scheduler to decay the LR over time
+            scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=100, gamma=0.5)
         elif optimizer_type == "lbfgs":
             optimizer = optim.LBFGS([generated], lr=learning_rate, max_iter=lbfgs_max_iter)
         else:
@@ -140,47 +143,51 @@ class StyleReconstructor:
         
         # Training loop
         for i in range(iterations):
-            # Different optimization step depending on optimizer type
             if optimizer_type == "adam":
                 # Calculate style loss
                 total_loss = self._calculate_style_loss(generated, target_style_features)
+                # Optionally add TV loss for smoothness
+                if tv_weight > 0:
+                    total_loss += tv_weight * self._total_variation_loss(generated)
                 
                 # Backward pass
                 optimizer.zero_grad()
                 total_loss.backward()
                 optimizer.step()
+                scheduler.step()  # Update learning rate
                 
-                # Record loss
                 current_loss = total_loss.item()
-                
             else:  # LBFGS
-                # Define closure for LBFGS
+                # Define closure for LBFGS optimizer
                 def closure():
                     optimizer.zero_grad()
+                    with torch.no_grad():
+                        generated.clamp_(0, 1)
                     total_loss = self._calculate_style_loss(generated, target_style_features)
+                    if tv_weight > 0:
+                        total_loss += tv_weight * self._total_variation_loss(generated)
                     total_loss.backward()
                     return total_loss
                 
-                # Run optimization step
                 loss = optimizer.step(closure)
                 current_loss = loss.item()
             
-            # Add loss to history
+            # Record loss
             loss_history.append(current_loss)
             
-            # Print progress
+            # Print progress every 10 iterations
             if (i+1) % 10 == 0:
                 print(f"Iteration {i+1}/{iterations} - Loss: {current_loss:.4f}")
             
-            # Clamp pixel values to valid range [0,1]
+            # Clamp pixel values to [0,1]
             with torch.no_grad():
                 generated.data.clamp_(0, 1)
             
-            # Save intermediate results
+            # Save intermediate results every 50 iterations (or the first iteration)
             if (i+1) % 50 == 0 or i == 0:
                 self._save_image(generated, os.path.join(output_path, f"style_iter_{i+1}.jpg"))
         
-        # Save final results
+        # Save final reconstruction and loss plot
         self._save_image(generated, os.path.join(output_path, "style_reconstruction.jpg"))
         self._save_loss(loss_history, output_path, prefix="style_")
         
@@ -195,12 +202,16 @@ class StyleReconstructor:
             weight = self.style_weights[layer]
             current_gram = current_style_features[layer]
             target_gram = target_style_features[layer]
-            
-            # MSE between Gram matrices
             layer_loss = nn.functional.mse_loss(current_gram, target_gram)
             total_loss += weight * layer_loss
             
         return total_loss
+    
+    def _total_variation_loss(self, img):
+        """Calculate Total Variation loss to promote smoothness"""
+        tv_h = torch.mean(torch.abs(img[:, :, 1:, :] - img[:, :, :-1, :]))
+        tv_w = torch.mean(torch.abs(img[:, :, :, 1:] - img[:, :, :, :-1]))
+        return tv_h + tv_w
         
     def _save_image(self, tensor, path):
         """Convert tensor to PIL image and save"""
@@ -209,10 +220,10 @@ class StyleReconstructor:
     
     def _save_loss(self, loss_history, output_path, prefix=""):
         """Save loss values and plot"""
-        # Save as text file
+        # Save loss values as a text file
         np.savetxt(os.path.join(output_path, f"{prefix}loss_values.txt"), loss_history)
         
-        # Create loss plot
+        # Create and save a plot of loss over iterations
         plt.figure(figsize=(10, 6))
         plt.plot(loss_history)
         plt.title("Style Reconstruction Loss")

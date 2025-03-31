@@ -20,10 +20,10 @@ class VggFeatureExtractor(nn.Module):
             param.requires_grad = False
             
         # Store normalization parameters
-        # self.mean = torch.tensor([0.485, 0.456, 0.406]).view(-1, 1, 1).to(device)
-        # self.std = torch.tensor([0.229, 0.224, 0.225]).view(-1, 1, 1).to(device)
-        self.mean = torch.tensor([0.48235, 0.45882, 0.40784]).view(-1, 1, 1).to(device)
-        self.std = torch.tensor([0.00392156862745098, 0.00392156862745098, 0.00392156862745098]).view(-1, 1, 1).to(device)
+        self.mean = torch.tensor([0.485, 0.456, 0.406]).view(-1, 1, 1).to(device)
+        self.std = torch.tensor([0.229, 0.224, 0.225]).view(-1, 1, 1).to(device)
+        # self.mean = torch.tensor([0.48235, 0.45882, 0.40784]).view(-1, 1, 1).to(device)
+        # self.std = torch.tensor([0.00392156862745098, 0.00392156862745098, 0.00392156862745098]).view(-1, 1, 1).to(device)
     
     def normalize(self, x):
         """Normalize the input tensor according to ImageNet stats"""

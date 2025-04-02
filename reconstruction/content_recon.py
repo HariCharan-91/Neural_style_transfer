@@ -15,15 +15,19 @@ def total_variation_loss(img):
     return tv_h + tv_w
 
 class ContentReconstructor:
-    def __init__(self, image_path=None, target_layer=10, device="cuda"):
+    def __init__(self, image_path=None, target_layer=10, device="cuda" , model_type = "vgg16"):
         self.device = device
+        if model_type == 'vgg19':
+            self.size = 512
+        else:
+            self.size = 224
         if image_path:
             # Resize (224, 224) , PIL ---> Tensor
-            self.img = preprocess_image(image_path, device=device)
+            self.img = preprocess_image(image_path, device=device , size=self.size)
         else:
             self.img = None
         # Create a model that extracts features up to the target layer.
-        self.extractor = VggFeatureExtractor(target_layer=target_layer, device=device)
+        self.extractor = VggFeatureExtractor(target_layer=target_layer, device=device,model_type= model_type)
     
     def set_image(self, img_tensor):
         """Set preprocessed image tensor"""

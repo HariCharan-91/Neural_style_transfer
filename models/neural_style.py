@@ -55,7 +55,7 @@ class NeuralStyleTransfer:
         return tv_h + tv_w
     
     def transfer_style(self, iterations=500, output_path="style_transfer",
-                       content_weight=1, style_weight=1e6, tv_weight=1e-3,
+                       content_weight=1, style_weight=1000, tv_weight=1e-3,
                        learning_rate=0.1, optimizer_type="adam", 
                        init_image="content", noise_scale=0.1):
         
@@ -144,6 +144,7 @@ class NeuralStyleTransfer:
     
     def _save_image(self, tensor, path):
         img = tensor.squeeze(0).cpu().detach().clamp(0, 1)
+        
         transforms.ToPILImage()(img).save(path)
     
     def _save_loss(self, loss_history, output_path):

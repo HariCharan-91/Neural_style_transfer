@@ -4,25 +4,25 @@ import matplotlib.pyplot as plt
 
 def preprocess_image(image_path, size=224, device="cuda", display=False):
     """
-    Load an image and convert to tensor without normalization.
+    Optimized function to load an image, resize it using high-quality interpolation,
+    convert it to a tensor, and optionally display it.
     
     Args:
-        image_path: Path to the image file.
-        size: The size to which the image will be resized (size x size).
-        device: The device on which to load the tensor ('cuda' or 'cpu').
-        display: If True, displays the image before and after preprocessing.
-    
+        image_path (str): Path to the image file.
+        size (int): Target size (width and height) for resizing.
+        device (str): Device to load the tensor onto ('cuda' or 'cpu').
+        display (bool): Whether to display the original and preprocessed images.
+        
     Returns:
-        img_tensor: The preprocessed image tensor.
+        img_tensor (torch.Tensor): The preprocessed image tensor.
     """
     try:
-        # Load the image and convert to RGB
+        # Load and convert the image to RGB
         img = Image.open(image_path).convert("RGB")
-    except FileNotFoundError:
-        print(f"Error: Image not found at {image_path}")
+    except Exception as e:
+        print(f"Error loading image: {e}")
         return None
 
-    # Optionally display the original image
     if display:
         plt.figure()
         plt.imshow(img)
@@ -30,21 +30,18 @@ def preprocess_image(image_path, size=224, device="cuda", display=False):
         plt.axis("off")
         plt.show()
 
-    # Define the preprocessing steps
+    # Define preprocessing with bicubic interpolation and antialiasing for better clarity
     preprocess = transforms.Compose([
-        transforms.Resize((size, size), interpolation=Image.BICUBIC),
+        transforms.Resize((size, size), interpolation=Image.BICUBIC, antialias=True),
         transforms.ToTensor()  # Scales pixel values to [0, 1]
     ])
 
-    # Apply preprocessing and add a batch dimension
+    # Apply preprocessing and add a batch dimension, then move to the specified device
     img_tensor = preprocess(img).unsqueeze(0).to(device)
 
-    # Optionally display the preprocessed image (converted back to PIL)
     if display:
-        # Remove the batch dimension and move to CPU
-        processed_img = img_tensor.squeeze(0).cpu()
-        # Convert tensor to PIL image
-        img_after = transforms.ToPILImage()(processed_img)
+        # Convert tensor back to a PIL image for display purposes
+        img_after = transforms.ToPILImage()(img_tensor.squeeze(0).cpu())
         plt.figure()
         plt.imshow(img_after)
         plt.title("Preprocessed Image")

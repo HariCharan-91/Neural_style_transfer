@@ -9,7 +9,7 @@ from utils.image_utils import preprocess_image
 from models.vgg import VggFeatureExtractor
 
 class StyleReconstructor:
-    def __init__(self, style_image_path=None, target_layers=None, device="cuda"):
+    def __init__(self, style_image_path=None, target_layers=None, device="cuda" , model_type = "vgg19"):
         """
         Initialize style reconstructor with a style image and target layers.
         
@@ -20,6 +20,10 @@ class StyleReconstructor:
             device: Device to run the model on ('cuda' or 'cpu')
         """
         self.device = device
+        if model_type == 'vgg19':
+            self.size = 512
+        else:
+            self.size = 224
         
         # Set default style layers if not provided
         if target_layers is None:
@@ -29,13 +33,13 @@ class StyleReconstructor:
         
         # Process style image if path provided
         if style_image_path:
-            self.style_img = preprocess_image(style_image_path, device=device)
+            self.style_img = preprocess_image(style_image_path, device=device , size=self.size)
         else:
             self.style_img = None
             
         # Create feature extractors for each target layer
         self.extractors = {
-            layer: VggFeatureExtractor(target_layer=layer, device=device)
+            layer: VggFeatureExtractor(target_layer=layer, device=device , model_type=model_type)
             for layer in self.target_layers
         }
         
@@ -215,15 +219,15 @@ class StyleReconstructor:
         
     def _save_image(self, tensor, path):
         """Convert tensor to PIL image and save"""
-        img = tensor.squeeze(0).cpu().detach()
-        denormalization = transforms.Normalize((-2.12, -2.04, -1.80), (4.37, 4.46, 4.44))
-        img = denormalization(img).clamp(0, 1)
+        img = tensor.squeeze(0).cpu().detach().clamp(0,1)
+        # denormalization = transforms.Normalize((-2.12, -2.04, -1.80), (4.37, 4.46, 4.44))
+        # img = denormalization(img).clamp(0, 1)
         transforms.ToPILImage()(img).save(path)
     
     def _save_loss(self, loss_history, output_path, prefix=""):
         """Save loss values and plot"""
         # Save loss values as a text file
-        np.savetxt(os.path.join(output_path, f"{prefix}loss_values.txt"), loss_history)
+        # np.savetxt(os.path.join(output_path, f"{prefix}loss_values.txt"), loss_history)
         
         # Create and save a plot of loss over iterations
         plt.figure(figsize=(10, 6))

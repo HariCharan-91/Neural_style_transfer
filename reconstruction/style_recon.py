@@ -23,7 +23,7 @@ class StyleReconstructor:
         
         # Set default style layers if not provided
         if target_layers is None:
-            self.target_layers = [1, 6, 11, 20]  # Common style layers in VGG16
+            self.target_layers = [0 , 5 , 10 , 19 , 28]  # Common style layers in VGG16
         else:
             self.target_layers = target_layers
         
@@ -215,7 +215,9 @@ class StyleReconstructor:
         
     def _save_image(self, tensor, path):
         """Convert tensor to PIL image and save"""
-        img = tensor.squeeze(0).cpu().detach().clamp(0, 1)
+        img = tensor.squeeze(0).cpu().detach()
+        denormalization = transforms.Normalize((-2.12, -2.04, -1.80), (4.37, 4.46, 4.44))
+        img = denormalization(img).clamp(0, 1)
         transforms.ToPILImage()(img).save(path)
     
     def _save_loss(self, loss_history, output_path, prefix=""):

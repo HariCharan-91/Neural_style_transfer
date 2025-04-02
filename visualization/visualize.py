@@ -1,4 +1,6 @@
 import matplotlib.pyplot as plt
+import torch
+import seaborn as sns
 
 def feature_visualization(feature_maps, layer_name="Layer 19"):
     """
@@ -20,4 +22,16 @@ def feature_visualization(feature_maps, layer_name="Layer 19"):
         plt.title(f"Ch {i+1}")
     
     plt.tight_layout()
+    plt.show()
+
+def heat_map(gram_matrix , layer_name = ""):
+    """
+    Visulaize the Correlations between the feature maps of the layer
+    """
+    gram_np = gram_matrix.squeeze(0).cpu().numpy()
+
+    plt.figure(figsize=(8, 8))
+    plt.imshow(gram_np, interpolation='nearest', cmap='gray')
+    plt.title("Gram Matrix")
+    plt.colorbar()
     plt.show()

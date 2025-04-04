@@ -1,6 +1,8 @@
 from PIL import Image
 import torchvision.transforms as transforms
 import matplotlib.pyplot as plt
+import torch
+
 
 def preprocess_image(image_path, size=224, device="cuda", display=False):
     """
@@ -47,5 +49,20 @@ def preprocess_image(image_path, size=224, device="cuda", display=False):
         plt.title("Preprocessed Image")
         plt.axis("off")
         plt.show()
-
     return img_tensor
+
+
+
+
+def save_image(tensor, path):
+    """Convert tensor to PIL image and save"""
+    img = tensor.squeeze(0).cpu().detach().clamp(0, 1)
+    transforms.ToPILImage()(img).save(path)
+
+def compute_gram_matrix(features):
+    """Compute the Gram matrix from features."""
+    _, channels, height, width = features.size()
+    features_reshaped = features.view(channels, height * width)
+    gram = torch.mm(features_reshaped, features_reshaped.t())
+    # Normalize by the size of the feature map
+    return gram.div(channels * height * width)

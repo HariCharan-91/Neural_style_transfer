@@ -14,6 +14,7 @@ env/
 *.gif
 dataset/
 images/
+trial/
 
 # Ignore model checkpoints
 checkpoints/
@@ -35,3 +36,4 @@ output_images/
 # Ignore IDE-specific files
 .vscode/
 .idea/
+experiments.ipynb

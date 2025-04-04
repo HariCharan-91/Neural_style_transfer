@@ -1,240 +1,277 @@
 import torch
-import torch.optim as optim
 import torch.nn as nn
-from torchvision import transforms
+import torch.optim as optim
 import matplotlib.pyplot as plt
-import numpy as np
+import time
+import torchvision.transforms as transforms
 import os
-from utils.image_utils import preprocess_image
+# Import your existing classes
 from models.vgg import VggFeatureExtractor
+from utils.image_utils import preprocess_image , save_image , compute_gram_matrix
+from visualization.visualize import plot_loss , show_progress
+from utils.losses import tv_loss_fn , style_loss_fn
 
 class StyleReconstructor:
-    def __init__(self, style_image_path=None, target_layers=None, device="cuda" , model_type = "vgg19"):
-        """
-        Initialize style reconstructor with a style image and target layers.
-        
-        Args:
-            style_image_path: Path to the style image
-            target_layers: List of VGG layer indices to extract style features from
-                          Default is [1, 6, 11, 20] (typical style layers in VGG16)
-            device: Device to run the model on ('cuda' or 'cpu')
-        """
+    """
+    Reconstructs style from an original image using VGG features.
+    
+    Args:
+        style_image_path (str): Path to the style image.
+        style_layers (list): List of layer indices to extract style features from.
+        device (str): Device to use ('cuda' or 'cpu').
+        model_type (str): Type of VGG model ('vgg16' or 'vgg19').
+        image_size (int): Size of the output image.
+    """
+    def __init__(self, style_image_path, style_layers=[1, 6, 11, 20, 29], 
+                 device="cuda", model_type="vgg16", image_size = 224):
         self.device = device
-        if model_type == 'vgg19':
-            self.size = 512
-        else:
-            self.size = 224
+        self.image_size = 224 if model_type == "vgg16" else 512
         
-        # Set default style layers if not provided
-        if target_layers is None:
-            self.target_layers = [0 , 5 , 10 , 19 , 28]  # Common style layers in VGG16
-        else:
-            self.target_layers = target_layers
+        # Load and preprocess the style image
+        # print(f"Loading style image from {style_image_path}...")
+        self.style_image = preprocess_image(style_image_path, size=image_size, device=device)
         
-        # Process style image if path provided
-        if style_image_path:
-            self.style_img = preprocess_image(style_image_path, device=device , size=self.size)
+        # Initialize feature extractors for each style layer
+        # print(f"Initializing VGG {model_type} feature extractors...")
+        self.style_extractors = {}
+        for layer in style_layers:
+            self.style_extractors[layer] = VggFeatureExtractor(
+                target_layer=layer, device=device, model_type=model_type
+            )
+        
+        # Compute style features from the original image
+     
+        self.style_features = {}
+        for layer, extractor in self.style_extractors.items():
+            features = extractor(self.style_image)
+            self.style_features[layer] = compute_gram_matrix(features)
+        # print("Style features computed successfully.")
+     
+    def _initialize_image(self, init_method="noise", noise_factor=0.1):
+        """Initialize the image to be optimized."""
+        print(f"Initializing image with method: {init_method}")
+        if init_method == "noise":
+            # Pure Gaussian noise
+            img = torch.randn(1, 3, self.image_size, self.image_size).to(self.device)
+        elif init_method == "style_with_noise":
+            # Style image with added noise
+            img = self.style_image.clone()
+            noise = torch.randn_like(img) * noise_factor
+            img = img + noise
         else:
-            self.style_img = None
+            # Default to white noise
+            img = torch.randn(1, 3, self.image_size, self.image_size).to(self.device)
             
-        # Create feature extractors for each target layer
-        self.extractors = {
-            layer: VggFeatureExtractor(target_layer=layer, device=device , model_type=model_type)
-            for layer in self.target_layers
-        }
-        
-        # Style weights for each layer (deeper layers get more weight)
-        self.style_weights = {}
-        total_layers = len(self.target_layers)
-        for i, layer in enumerate(self.target_layers):
-            # Increasing weight for deeper layers
-            self.style_weights[layer] = 0.5 + (i / total_layers)
-            
-    def set_style_image(self, img_tensor):
-        """Set preprocessed style image tensor"""
-        self.style_img = img_tensor
-        
-    def set_style_weights(self, weight_dict):
-        """Set custom weights for style layers"""
-        self.style_weights = weight_dict
-        
-    def _gram_matrix(self, x):
+        # Ensure values are clamped to valid range
+        img = torch.clamp(img, 0, 1)
+        return img.requires_grad_(True)
+    
+    def reconstruct(self, optimizer_type="lbfgs", init_method="noise", 
+                   num_steps=300, style_weight=1e6, tv_weight=1e2, 
+                   lr=0.01, noise_factor=0.1, print_freq=10, 
+                   show_images=True,output_path = "output/style"):
         """
-        Calculate Gram matrix for style representation
+        Reconstruct style from the original image.
         
         Args:
-            x: Feature maps tensor of shape [batch, channels, height, width]
+            optimizer_type (str): Type of optimizer to use ('lbfgs' or 'adam').
+            init_method (str): Method to initialize the image ('noise' or 'style_with_noise').
+            num_steps (int): Number of optimization steps.
+            style_weight (float): Weight for style loss.
+            tv_weight (float): Weight for total variation loss.
+            lr (float): Learning rate for optimizer.
+            noise_factor (float): Factor for noise when using 'style_with_noise'.
+            print_freq (int): Frequency to print progress to terminal.
+            show_images (bool): Whether to display images during optimization.
             
         Returns:
-            Gram matrix of shape [batch, channels, channels]
+            torch.Tensor: Reconstructed image tensor.
         """
-        batch_size, channels, height, width = x.size()
-        features = x.view(batch_size, channels, height * width)
-        gram = torch.bmm(features, features.transpose(1, 2))
-        # Normalize by the number of elements
-        return gram.div(channels * height * width)
-        
-    def extract_style_features(self, image):
-        """
-        Extract style features (Gram matrices) from all target layers
-        
-        Args:
-            image: Input image tensor
-            
-        Returns:
-            Dictionary of style features (Gram matrices) for each layer
-        """
-        style_features = {}
-        for layer, extractor in self.extractors.items():
-            features = extractor(image)
-            style_features[layer] = self._gram_matrix(features)
-        return style_features
-        
-    def reconstruct(self, iterations=500, output_path="style_output", 
-                    learning_rate=0.01, img_size=224, 
-                    optimizer_type="adam", lbfgs_max_iter=20, 
-                    use_style_init=False, init_noise_scale=0.1, tv_weight=0.001):
-        """
-        Reconstruct an image that matches the style of the input style image
-        
-        Args:
-            iterations: Number of optimization iterations
-            output_path: Directory to save outputs
-            learning_rate: Learning rate for optimization
-            img_size: Size of the output image (if using pure noise init)
-            optimizer_type: Type of optimizer to use ('adam' or 'lbfgs')
-            lbfgs_max_iter: Max iterations per step for LBFGS optimizer
-            use_style_init: Whether to initialize with style image + noise
-            init_noise_scale: Scale of noise for initialization
-            tv_weight: Weight for total variation loss (set to 0 to disable)
-        """
-        # Check that style image is set
-        if self.style_img is None:
-            raise ValueError("No style image set for reconstruction")
-            
-        # Create output directory
         os.makedirs(output_path, exist_ok=True)
         
-        # Extract target style features
-        with torch.no_grad():
-            target_style_features = self.extract_style_features(self.style_img)
-        
         # Initialize image
-        if use_style_init:
-            # Initialize with style image + noise for a better starting point
-            generated = self.style_img.clone() + init_noise_scale * torch.randn_like(self.style_img, device=self.device)
-            generated.requires_grad_(True)
+        generated = self._initialize_image(init_method, noise_factor)
+        
+        # Setup optimizer
+        print(f"Setting up {optimizer_type} optimizer with learning rate {lr}...")
+        if optimizer_type.lower() == "lbfgs":
+            optimizer = optim.LBFGS([generated], lr=lr)
+        elif optimizer_type.lower() == "adam":
+            optimizer = optim.Adam([generated], lr=lr)
         else:
-            # Initialize with random noise
-            generated = torch.rand(1, 3, img_size, img_size, requires_grad=True, device=self.device)
+            raise ValueError("Unsupported optimizer. Choose 'lbfgs' or 'adam'.")
         
-        # Setup optimizer based on type
-        optimizer_type = optimizer_type.lower()
-        if optimizer_type == "adam":
-            optimizer = optim.Adam([generated], lr=learning_rate)
-            # Setup a learning rate scheduler to decay the LR over time
-            scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=100, gamma=0.5)
-        elif optimizer_type == "lbfgs":
-            optimizer = optim.LBFGS([generated], lr=learning_rate, max_iter=lbfgs_max_iter)
+        # For storing loss history
+        style_loss_history = []
+        tv_loss_history = []
+        total_loss_history = []
+        
+        # For displaying progress
+        if show_images and num_steps >= 10:
+            display_steps = [int(num_steps * i / 10) for i in range(11)]
         else:
-            raise ValueError(f"Unsupported optimizer type: {optimizer_type}. Use 'adam' or 'lbfgs'")
+            display_steps = []
         
-        # Track loss history
-        loss_history = []
+        # Start timer
+        start_time = time.time()
+        last_print_time = start_time
         
-        # Save original style image
-        self._save_image(self.style_img, os.path.join(output_path, "original_style.jpg"))
+        # Function to perform a single optimization step
+        def closure():
+            optimizer.zero_grad()
+            
+            # Compute style loss for each layer
+            total_style_loss = 0
+            for layer, extractor in self.style_extractors.items():
+                current_features = extractor(generated)
+                layer_style_loss = style_loss_fn(current_features, self.style_features[layer])
+                total_style_loss += layer_style_loss
+            
+            # Compute total variation loss
+            variation_loss = tv_loss_fn(generated)
+            
+            # Combine losses with their weights
+            weighted_style_loss = style_weight * total_style_loss
+            weighted_tv_loss = tv_weight * variation_loss
+            total_loss = weighted_style_loss + weighted_tv_loss
+            
+            # Record losses
+            style_loss_history.append(weighted_style_loss.item())
+            tv_loss_history.append(weighted_tv_loss.item())
+            total_loss_history.append(total_loss.item())
+            
+            # Compute gradients
+            total_loss.backward()
+            
+            # Clamp the image values after gradient step if using Adam
+            if optimizer_type.lower() == "adam":
+                with torch.no_grad():
+                    generated.clamp_(0, 1)
+            
+            return total_loss
         
-        # Training loop
-        for i in range(iterations):
-            if optimizer_type == "adam":
-                # Calculate style loss
-                total_loss = self._calculate_style_loss(generated, target_style_features)
-                # Optionally add TV loss for smoothness
-                if tv_weight > 0:
-                    total_loss += tv_weight * self._total_variation_loss(generated)
-                
-                # Backward pass
-                optimizer.zero_grad()
-                total_loss.backward()
-                optimizer.step()
-                scheduler.step()  # Update learning rate
-                
-                current_loss = total_loss.item()
-            else:  # LBFGS
-                # Define closure for LBFGS optimizer
-                def closure():
-                    optimizer.zero_grad()
-                    with torch.no_grad():
-                        generated.clamp_(0, 1)
-                    total_loss = self._calculate_style_loss(generated, target_style_features)
-                    if tv_weight > 0:
-                        total_loss += tv_weight * self._total_variation_loss(generated)
-                    total_loss.backward()
-                    return total_loss
-                
+        # Optimization loop
+        print(f"\nStarting style reconstruction with {optimizer_type} optimizer...")
+        print(f"Total steps: {num_steps}, Style weight: {style_weight}, TV weight: {tv_weight}")
+        print("-" * 80)
+        print(f"{'Step':>8} | {'Style Loss':>12} | {'TV Loss':>12} | {'Total Loss':>12} | {'Time (s)':>9}")
+        print("-" * 80)
+        
+        current_step = 0
+        
+        if optimizer_type.lower() == "lbfgs":
+            # L-BFGS optimizer
+            while current_step < num_steps:
                 loss = optimizer.step(closure)
-                current_loss = loss.item()
-            
-            # Record loss
-            loss_history.append(current_loss)
-            
-            # Print progress every 10 iterations
-            if (i+1) % 10 == 0:
-                print(f"Iteration {i+1}/{iterations} - Loss: {current_loss:.4f}")
-            
-            # Clamp pixel values to [0,1]
-            with torch.no_grad():
-                generated.data.clamp_(0, 1)
-            
-            # Save intermediate results every 50 iterations (or the first iteration)
-            if (i+1) % 50 == 0 or i == 0:
-                self._save_image(generated, os.path.join(output_path, f"style_iter_{i+1}.jpg"))
+                
+                # Manually clamp values for L-BFGS
+                with torch.no_grad():
+                    generated.clamp_(0, 1)
+                
+                # Display progress in terminal
+                if current_step % print_freq == 0 or current_step == num_steps - 1:
+                    current_time = time.time()
+                    elapsed = current_time - last_print_time
+                    last_print_time = current_time
+                    
+                    style_loss = style_loss_history[-1] if style_loss_history else 0
+                    tv_loss = tv_loss_history[-1] if tv_loss_history else 0
+                    total_loss = total_loss_history[-1] if total_loss_history else 0
+                    
+                    print(f"{current_step:>8} | {style_loss:>12.4e} | {tv_loss:>12.4e} | {total_loss:>12.4e} | {elapsed:>9.2f}")
+                
+                # Display image if requested
+                if show_images and current_step in display_steps:
+                    save_image(generated, os.path.join(output_path, f"iter_{current_step}.jpg"))
+                    # show_progress(generated.detach().clone(), current_step, num_steps)
+                current_step += 1
+        else:
+            # Adam optimizer
+            for step in range(num_steps):
+                loss = closure()
+                optimizer.step()
+                
+                # Print progress
+                if step % print_freq == 0 or step == num_steps - 1:
+                    current_time = time.time()
+                    elapsed = current_time - last_print_time
+                    last_print_time = current_time
+                    
+                    style_loss = style_loss_history[-1]
+                    tv_loss = tv_loss_history[-1]
+                    total_loss = total_loss_history[-1]
+                    
+                    print(f"{step:>8} | {style_loss:>12.4e} | {tv_loss:>12.4e} | {total_loss:>12.4e} | {elapsed:>9.2f}")
+                
+                # Display image if requested
+                if show_images and step in display_steps:
+                    save_image(generated, os.path.join(output_path, f"iter_{current_step}.jpg"))
+                    show_progress(generated.detach().clone(), step, num_steps)
         
-        # Save final reconstruction and loss plot
-        self._save_image(generated, os.path.join(output_path, "style_reconstruction.jpg"))
-        self._save_loss(loss_history, output_path, prefix="style_")
+        # Final timing
+        total_time = time.time() - start_time
+        print("-" * 80)
+        print(f"Optimization completed in {total_time:.2f} seconds")
         
-        return generated, loss_history
+        # Display final result
+        if show_images:
+            save_image(generated, os.path.join(output_path, f"Final_style.jpg"))
+            # show_progress(generated.detach().clone(), num_steps, num_steps, final=True)
+        
+        # Plot loss history
+        plot_loss(style_loss_history=style_loss_history, tv_loss_history=tv_loss_history, total_loss_history=total_loss_history)
+        
+        return generated.detach()
     
-    def _calculate_style_loss(self, image, target_style_features):
-        """Calculate weighted style loss across all target layers"""
-        total_loss = 0
-        current_style_features = self.extract_style_features(image)
-        
-        for layer in self.target_layers:
-            weight = self.style_weights[layer]
-            current_gram = current_style_features[layer]
-            target_gram = target_style_features[layer]
-            layer_loss = nn.functional.mse_loss(current_gram, target_gram)
-            total_loss += weight * layer_loss
-            
-        return total_loss
+
+
+# # Example usage
+# if __name__ == "__main__":
+#     # Paths and parameters
+#     style_image_path = r"data\style\neural_style_transfer_5_1 (1).jpg"  # Replace with your style image path
+#     output_path = "style_reconstructed.jpg"
+#     device = "cuda" if torch.cuda.is_available() else "cpu"
     
-    def _total_variation_loss(self, img):
-        """Calculate Total Variation loss to promote smoothness"""
-        tv_h = torch.mean(torch.abs(img[:, :, 1:, :] - img[:, :, :-1, :]))
-        tv_w = torch.mean(torch.abs(img[:, :, :, 1:] - img[:, :, :, :-1]))
-        return tv_h + tv_w
-        
-    def _save_image(self, tensor, path):
-        """Convert tensor to PIL image and save"""
-        img = tensor.squeeze(0).cpu().detach().clamp(0,1)
-        # denormalization = transforms.Normalize((-2.12, -2.04, -1.80), (4.37, 4.46, 4.44))
-        # img = denormalization(img).clamp(0, 1)
-        transforms.ToPILImage()(img).save(path)
+#     print(f"Using device: {device}")
     
-    def _save_loss(self, loss_history, output_path, prefix=""):
-        """Save loss values and plot"""
-        # Save loss values as a text file
-        # np.savetxt(os.path.join(output_path, f"{prefix}loss_values.txt"), loss_history)
+#     # Create style reconstructor
+#     reconstructor = StyleReconstructor(
+#         style_image_path=style_image_path,
+#         style_layers=[1, 4, 7, 10, 13],  # VGG layers to extract features from
+#         device=device,
+#         model_type="vgg19",
+#         image_size=512
+#     )
+    
+#     # Reconstruct style
+#     reconstructed_image = reconstructor.reconstruct(
+#         optimizer_type="lbfgs",  # or "adam"
+#         init_method="noise",     # or "style_with_noise"
+#         num_steps=300,
+#         style_weight=1e6,
+#         tv_weight=1e2,          # Weight for total variation loss
+#         lr=0.01,
+#         noise_factor=0.1,
+#         print_freq=10,          # Print progress every 10 steps
+#         show_images=True        # Show images during optimization
+#     )
+
+# #     reconstructed_image = reconstructor.reconstruct(
+# #     optimizer_type="adam",
+# #     init_method="noise",
+# #     num_steps=1000,
+# #     style_weight=1e6,
+# #     tv_weight=1e2,
+# #     lr=0.001
+# # )
+#     reconstructed_image = reconstructor.reconstruct(
+#         optimizer_type="lbfgs",
+#         init_method="noise",
+#         num_steps=100,
+#         style_weight=1e6,
+#         tv_weight=5e1,
+#         lr=0.1
+#     )
         
-        # Create and save a plot of loss over iterations
-        plt.figure(figsize=(10, 6))
-        plt.plot(loss_history)
-        plt.title("Style Reconstruction Loss")
-        plt.xlabel("Iteration")
-        plt.ylabel("Loss")
-        plt.grid(True)
-        plt.savefig(os.path.join(output_path, f"{prefix}loss_plot.png"))
-        plt.close()
+#     # Save result
+#     reconstructor.save_result(reconstructed_image, output_path)

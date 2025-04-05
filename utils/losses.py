@@ -37,5 +37,5 @@ def tv_loss_fn(img, regularization='L1'):
 
 def style_loss_fn(current_features, target_gram):
     """Compute style loss between current features and target gram matrix."""
-    gram = compute_gram_matrix(current_features)
-    return nn.functional.mse_loss(gram, target_gram)
+    # gram = compute_gram_matrix(current_features)
+    return nn.functional.mse_loss(current_features, target_gram)

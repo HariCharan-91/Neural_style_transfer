@@ -20,6 +20,7 @@ trial/
 checkpoints/
 *.pth
 *.pt
+*.ipynb
 
 # Ignore logs and debug files
 logs/

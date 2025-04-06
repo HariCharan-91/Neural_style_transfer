@@ -3,17 +3,17 @@ import torch.nn as nn
 import torch.optim as optim
 import matplotlib.pyplot as plt
 import time
-import torchvision.transforms as transforms
 import os
-# Import your existing classes
-from models.vgg import VggFeatureExtractor
-from utils.image_utils import preprocess_image , save_image , compute_gram_matrix
-from visualization.visualize import plot_loss , show_progress
-from utils.losses import tv_loss_fn , style_loss_fn
+# Import the optimized VGG feature extractor
+from models.vgg_fast import VggFeatureExtractor
+from utils.image_utils import preprocess_image, save_image, compute_gram_matrix
+from visualization.visualize import plot_loss, show_progress
+from utils.losses import tv_loss_fn, style_loss_fn
 
 class StyleReconstructor:
     """
     Reconstructs style from an original image using VGG features.
+    Optimized to use a single VGG model for all feature extraction.
     
     Args:
         style_image_path (str): Path to the style image.
@@ -23,29 +23,36 @@ class StyleReconstructor:
         image_size (int): Size of the output image.
     """
     def __init__(self, style_image_path, style_layers=[1, 6, 11, 20, 29], 
-                 device="cuda", model_type="vgg16", image_size = 224):
+                 device="cuda", model_type="vgg16", image_size=224):
         self.device = device
-        self.image_size = 224 if model_type == "vgg16" else 512
+        self.style_layers = style_layers
+        self.image_size = image_size
         
         # Load and preprocess the style image
-        # print(f"Loading style image from {style_image_path}...")
         self.style_image = preprocess_image(style_image_path, size=image_size, device=device)
         
-        # Initialize feature extractors for each style layer
-        # print(f"Initializing VGG {model_type} feature extractors...")
-        self.style_extractors = {}
-        for layer in style_layers:
-            self.style_extractors[layer] = VggFeatureExtractor(
-                target_layer=layer, device=device, model_type=model_type
-            )
+        # Initialize a single feature extractor for all style layers
+        self.extractor = VggFeatureExtractor(
+            target_layers=style_layers, 
+            device=device, 
+            model_type=model_type
+        )
         
         # Compute style features from the original image
-     
-        self.style_features = {}
-        for layer, extractor in self.style_extractors.items():
-            features = extractor(self.style_image)
-            self.style_features[layer] = compute_gram_matrix(features)
-        # print("Style features computed successfully.")
+        with torch.no_grad():
+            style_features_dict = self.extractor(self.style_image)
+            
+            # Handle both single layer and multi-layer cases
+            if isinstance(style_features_dict, dict):
+                self.style_features = {
+                    layer: compute_gram_matrix(features) 
+                    for layer, features in style_features_dict.items()
+                }
+            else:
+                # Handle case where only one layer was specified and a tensor is returned
+                self.style_features = {
+                    style_layers[0]: compute_gram_matrix(style_features_dict)
+                }
      
     def _initialize_image(self, init_method="noise", noise_factor=0.1):
         """Initialize the image to be optimized."""
@@ -69,7 +76,7 @@ class StyleReconstructor:
     def reconstruct(self, optimizer_type="lbfgs", init_method="noise", 
                    num_steps=300, style_weight=1e6, tv_weight=1e2, 
                    lr=0.01, noise_factor=0.1, print_freq=10, 
-                   show_images=True,output_path = "output/style"):
+                   show_images=True, output_path="output/style"):
         """
         Reconstruct style from the original image.
         
@@ -83,6 +90,7 @@ class StyleReconstructor:
             noise_factor (float): Factor for noise when using 'style_with_noise'.
             print_freq (int): Frequency to print progress to terminal.
             show_images (bool): Whether to display images during optimization.
+            output_path (str): Directory to save output images.
             
         Returns:
             torch.Tensor: Reconstructed image tensor.
@@ -107,7 +115,7 @@ class StyleReconstructor:
         total_loss_history = []
         
         # For displaying progress
-        if show_images and num_steps >= 10:
+        if num_steps >= 10:
             display_steps = [int(num_steps * i / 10) for i in range(11)]
         else:
             display_steps = []
@@ -120,12 +128,25 @@ class StyleReconstructor:
         def closure():
             optimizer.zero_grad()
             
+            # Get all feature maps in one forward pass
+            current_features = self.extractor(generated)
+            
             # Compute style loss for each layer
             total_style_loss = 0
-            for layer, extractor in self.style_extractors.items():
-                current_features = extractor(generated)
-                layer_style_loss = style_loss_fn(current_features, self.style_features[layer])
+            
+            # Handle both single layer and multi-layer cases
+            if len(self.style_layers) == 1 and not isinstance(current_features, dict):
+                # Single layer case
+                current_gram = compute_gram_matrix(current_features)
+                layer = self.style_layers[0]
+                layer_style_loss = style_loss_fn(current_gram, self.style_features[layer])
                 total_style_loss += layer_style_loss
+            else:
+                # Multi-layer case
+                for layer in self.style_layers:
+                    current_gram = compute_gram_matrix(current_features[layer])
+                    layer_style_loss = style_loss_fn(current_gram, self.style_features[layer])
+                    total_style_loss += layer_style_loss
             
             # Compute total variation loss
             variation_loss = tv_loss_fn(generated)
@@ -181,9 +202,11 @@ class StyleReconstructor:
                     print(f"{current_step:>8} | {style_loss:>12.4e} | {tv_loss:>12.4e} | {total_loss:>12.4e} | {elapsed:>9.2f}")
                 
                 # Display image if requested
-                if show_images and current_step in display_steps:
+                if current_step in display_steps:
                     save_image(generated, os.path.join(output_path, f"iter_{current_step}.jpg"))
-                    # show_progress(generated.detach().clone(), current_step, num_steps)
+                    if show_images :
+                        show_progress(generated.detach().clone(), current_step, num_steps)
+                        
                 current_step += 1
         else:
             # Adam optimizer
@@ -205,8 +228,7 @@ class StyleReconstructor:
                 
                 # Display image if requested
                 if show_images and step in display_steps:
-                    save_image(generated, os.path.join(output_path, f"iter_{current_step}.jpg"))
-                    show_progress(generated.detach().clone(), step, num_steps)
+                    save_image(generated, os.path.join(output_path, f"iter_{step}.jpg"))
         
         # Final timing
         total_time = time.time() - start_time
@@ -216,62 +238,8 @@ class StyleReconstructor:
         # Display final result
         if show_images:
             save_image(generated, os.path.join(output_path, f"Final_style.jpg"))
-            # show_progress(generated.detach().clone(), num_steps, num_steps, final=True)
         
         # Plot loss history
         plot_loss(style_loss_history=style_loss_history, tv_loss_history=tv_loss_history, total_loss_history=total_loss_history)
         
         return generated.detach()
-    
-
-
-# # Example usage
-# if __name__ == "__main__":
-#     # Paths and parameters
-#     style_image_path = r"data\style\neural_style_transfer_5_1 (1).jpg"  # Replace with your style image path
-#     output_path = "style_reconstructed.jpg"
-#     device = "cuda" if torch.cuda.is_available() else "cpu"
-    
-#     print(f"Using device: {device}")
-    
-#     # Create style reconstructor
-#     reconstructor = StyleReconstructor(
-#         style_image_path=style_image_path,
-#         style_layers=[1, 4, 7, 10, 13],  # VGG layers to extract features from
-#         device=device,
-#         model_type="vgg19",
-#         image_size=512
-#     )
-    
-#     # Reconstruct style
-#     reconstructed_image = reconstructor.reconstruct(
-#         optimizer_type="lbfgs",  # or "adam"
-#         init_method="noise",     # or "style_with_noise"
-#         num_steps=300,
-#         style_weight=1e6,
-#         tv_weight=1e2,          # Weight for total variation loss
-#         lr=0.01,
-#         noise_factor=0.1,
-#         print_freq=10,          # Print progress every 10 steps
-#         show_images=True        # Show images during optimization
-#     )
-
-# #     reconstructed_image = reconstructor.reconstruct(
-# #     optimizer_type="adam",
-# #     init_method="noise",
-# #     num_steps=1000,
-# #     style_weight=1e6,
-# #     tv_weight=1e2,
-# #     lr=0.001
-# # )
-#     reconstructed_image = reconstructor.reconstruct(
-#         optimizer_type="lbfgs",
-#         init_method="noise",
-#         num_steps=100,
-#         style_weight=1e6,
-#         tv_weight=5e1,
-#         lr=0.1
-#     )
-        
-#     # Save result
-#     reconstructor.save_result(reconstructed_image, output_path)

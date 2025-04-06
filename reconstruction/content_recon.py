@@ -9,7 +9,7 @@ import time
 from utils.image_utils import preprocess_image , save_image
 from visualization.visualize import plot_loss
 import utils.losses as loss_fn
-from models.vgg import VggFeatureExtractor
+from models.vgg_fast import VggFeatureExtractor
 
 
 class ContentReconstructor:
@@ -24,7 +24,7 @@ class ContentReconstructor:
         else:
             self.img = None
         # Create a model that extracts features up to the target layer.
-        self.extractor = VggFeatureExtractor(target_layer=target_layer, device=device, model_type=model_type)
+        self.extractor = VggFeatureExtractor(target_layers=target_layer, device=device, model_type=model_type)
     
     # def set_image(self, img_tensor):
     #     """Set preprocessed image tensor"""

@@ -1,0 +1,44 @@
+# Ignore Python cache files
+__pycache__/
+*.pyc
+*.pyo
+
+# Ignore virtual environments
+venv/
+env/
+
+# Ignore dataset and large image files
+*.jpg
+*.png
+*.jpeg
+*.gif
+dataset/
+images/
+trial/
+
+# Ignore model checkpoints
+checkpoints/
+*.pth
+*.pt
+*.ipynb
+
+# Ignore logs and debug files
+logs/
+*.log
+debug/
+
+# Ignore Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Ignore animation output files
+reconstruction_progress.gif
+output_images/
+
+# Ignore IDE-specific files
+.vscode/
+.idea/
+experiments.ipynb
+
+!data/**/*.jpg
+!data/**/*.png
+!data/**/*.gif

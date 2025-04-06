@@ -113,6 +113,9 @@ Reconstruct the style features from multiple layers of the network.
 
 
 ```bash
+# LBFGS works better for style reconstruction 
+# --init_method noise (recommended)
+
 python run.py style --style_image data/styles/style.jpg --init_method noise --style_weight 1e3 --iterations 100 --lr 1 --optimizer lbfgs --tv_weight 1e-3 --noise_scale 0.1 
 ```
 
@@ -142,6 +145,18 @@ python run.py visualize --image data\content\rain.jpg --target_layer 1
 ### 4. Neural Style Transfer
 
 Combine the content of one image with the style of another.
+
+### 🛠️ Image Initialization Methods
+
+This project supports several **initialization strategies** for generating the stylized image. You can specify the method using the `--init_method` argument.
+
+| Method              | Description                                                                 |
+|---------------------|-----------------------------------------------------------------------------|
+| `content`           | Starts with the content image — helps preserve original structure.          |
+| `noise`             | Begins with random noise — allows full artistic freedom.                    |
+| `content_with_noise`| Adds slight noise to the content image — introduces creativity with control.|
+| `style`             | Uses the style image as the base — quickly adopts style characteristics.    |
+| `style_with_noise`  | Adds noise to the style image — enhances style transfer variation.          |
 
 ```bash
 python run.py nst --content_image data/contents/content.jpg --style_image data/styles/style.jpg --content_layer 21 --content_weight 1 --style_weight 1e5 --init_method content_with_noise --iterations 500 --lr 1.0 --optimizer lbfgs --tv_weight 1e-2 

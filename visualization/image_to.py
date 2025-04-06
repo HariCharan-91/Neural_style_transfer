@@ -1,12 +1,12 @@
 from PIL import Image
 import os
 
-def gif_convert(path=r"C:\Users\lenovo\Projects\Neural_Style_Transfer\output\style_transfer", explicit_image=r"final_stylized.jpg"):
+def gif_convert(path=r"C:\Users\lenovo\Projects\Neural_Style_Transfer\output\style_transfer", explicit_image=r"final_stylized.jpg" , starts_with = "iter"):
     # Filter for images that start with "iter" and have valid extensions
     iter_images = [
         f for f in os.listdir(path)
         if f.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.gif'))
-        and f.startswith("iter")
+        and f.startswith(starts_with)
     ]
     
     # Sort the images that start with "iter"
@@ -40,4 +40,9 @@ def gif_convert(path=r"C:\Users\lenovo\Projects\Neural_Style_Transfer\output\sty
 # Call the function with an explicit image, or use None if not needed
 # gif_convert(explicit_image="content_final.jpg")
 # To run without an explicit image, you can also call:
-gif_convert(explicit_image=None)
+
+# gif_convert(explicit_image=None , path = r"C:\Users\lenovo\Projects\Neural_Style_Transfer\feature_maps" , starts_with="Layer")
+# gif_convert(explicit_image=None)
+
+# gif_convert(explicit_image="reconstruction.jpg" ,path=r"C:\Users\lenovo\Projects\Neural_Style_Transfer\output\content" ,starts_with="iter")
+gif_convert(explicit_image=None ,path=r"C:\Users\lenovo\Projects\Neural_Style_Transfer\output\style" ,starts_with="iter")

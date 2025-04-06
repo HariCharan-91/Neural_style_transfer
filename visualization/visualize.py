@@ -2,28 +2,42 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import torchvision.transforms as transforms
 import os
+# from utils.image_utils import save_image
 
-def feature_visualization(feature_maps, layer_name="Layer 19"):
+def feature_visualization(feature_maps, layer_name="Layer", save=False, save_dir="feature_maps"):
     """
-    Visualizes first 16 channels of feature maps from a single layer
+    Visualizes the first 16 feature maps and optionally saves all of them.
     """
     if feature_maps is None:
         raise ValueError("No feature maps detected!")
-    
-    features = feature_maps.detach().cpu().squeeze(0)
-    num_channels = min(16, features.shape[0])  # Show first 16 channels
-    
+
+    features = feature_maps.detach().cpu().squeeze(0)  # [C, H, W]
+    total_channels = features.shape[0]
+    num_channels_to_show = min(16, total_channels)
+
     plt.figure(figsize=(15, 8))
-    plt.suptitle(f"Style Feature Maps: {layer_name}", fontsize=14)
-    
-    for i in range(num_channels):
-        plt.subplot(4, 4, i+1)
+    plt.suptitle(f"Feature Maps: {layer_name}", fontsize=14)
+
+    if save and not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+
+    # Show first 16
+    for i in range(num_channels_to_show):
+        plt.subplot(4, 4, i + 1)
         plt.imshow(features[i], cmap='viridis')
         plt.axis('off')
         plt.title(f"Ch {i+1}")
-    
+
+    # Save all channels
+    if save:
+        for i in range(total_channels):
+            feature_np = features[i].numpy()
+            save_path = os.path.join(save_dir, f"{layer_name}_ch_{i + 1}.png")
+            plt.imsave(save_path, feature_np, cmap='viridis')
+
     plt.tight_layout()
     plt.show()
+
 
 def heat_map(gram_matrix , layer_name = ""):
     """

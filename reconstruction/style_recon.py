@@ -30,6 +30,8 @@ class StyleReconstructor:
         
         # Load and preprocess the style image
         self.style_image = preprocess_image(style_image_path, size=image_size, device=device)
+
+
         
         # Initialize a single feature extractor for all style layers
         self.extractor = VggFeatureExtractor(
@@ -100,6 +102,7 @@ class StyleReconstructor:
         # Initialize image
         generated = self._initialize_image(init_method, noise_factor)
         
+        save_image(self.style_image , path=os.path.join(output_path, "original.jpg"))
         # Setup optimizer
         print(f"Setting up {optimizer_type} optimizer with learning rate {lr}...")
         if optimizer_type.lower() == "lbfgs":

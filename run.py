@@ -67,7 +67,7 @@ def run_feature_visualization(args):
     tensor = preprocess_image(args.image, size=args.image_size)
     model = VggFeatureExtractor(args.target_layer, device=device, model_type=args.model_type)
     features = model(tensor)
-    feature_visualization(features, f"Layer {args.target_layer}")
+    feature_visualization(feature_maps=features, layer_name = f"Layer {args.target_layer}" , save = args.save)
 
 def run_neural_style_transfer(args):
     """Run neural style transfer with given arguments"""
@@ -133,6 +133,7 @@ if __name__ == "__main__":
     vis_parser = subparsers.add_parser('visualize', parents=[common_parser], help='Feature visualization')
     vis_parser.add_argument('--image', type=str, required=True, help='Path to image')
     vis_parser.add_argument('--target_layer', type=int, default=10, help='Target layer for visualization')
+    vis_parser.add_argument('--save', action="store_true", help='to save all the feature maps')
     
     # Neural Style Transfer specific arguments
     nst_parser = subparsers.add_parser('nst', parents=[common_parser], help='Neural Style Transfer')
@@ -159,7 +160,6 @@ if __name__ == "__main__":
         run_neural_style_transfer(args)
     else:
         parser.print_help()
-
 
 
 # style reconstruction -[ init - content   ,  ( sw = 1e3 , tvw = 1e-3 ) ]

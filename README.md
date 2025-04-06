@@ -9,17 +9,17 @@ This project implements the Neural Style Transfer (NST) algorithm using PyTorch,
 <table align="center" cellpadding="20">
   <tr>
     <td align="center" style="padding-right: 40px;">
-      <img src="data/content/firy.jpg" alt="Content Image" width="400"/><br/>
+      <img src="data/content/firy.jpg" alt="Content Image" width="300"/><br/>
       <strong>Content 🖼️</strong><br/><br/>
       <span style="font-size: 24px;">➕</span><br/><br/>
-      <img src="data/style/giger_crop.jpg" alt="Style Image" width="400"/><br/>
+      <img src="data/style/giger_crop.jpg" alt="Style Image" width="300"/><br/>
       <strong>Style 🎨</strong>
     </td>
     <td align="center" style="font-size: 32px; padding: 0 40px;">
       <strong>=</strong>
     </td>
     <td align="center" style="padding-left: 40px;">
-      <img src="data/generated/firy_giger.jpg" alt="Stylized Output" width="400"/><br/>
+      <img src="data/generated/firy_giger.jpg" alt="Stylized Output" width="300"/><br/>
       <strong>Stylized Output 🧠🖌️</strong>
     </td>
   </tr>
@@ -78,11 +78,11 @@ Reconstruct the content features from a specific layer of the network.
 <table align="center" style="border-collapse: collapse; text-align: center;">
   <tr>
     <td style="padding: 10px;">
-      <img src="data/content/firy_resized.jpg" width="400" style="border: none;" />
+      <img src="data/content/firy_resized.jpg" width="300" style="border: none;" />
     </td>
     <td style="padding: 10px; vertical-align: middle; font-size: 32px;">➡️</td>
     <td style="padding: 10px;">
-      <img src="data/generated/gifs/firy_content_layer10.gif" width="400" style="border: none;" />
+      <img src="data/generated/gifs/firy_content_layer10.gif" width="300" style="border: none;" />
     </td>
   </tr>
 </table>
@@ -102,11 +102,11 @@ Reconstruct the style features from multiple layers of the network.
 <table align="center" style="border-collapse: collapse; text-align: center;">
   <tr>
     <td style="padding: 10px;">
-      <img src="data/generated/stary_night_resized.jpg" width="400" style="border: none;"/>
+      <img src="data/generated/stary_night_resized.jpg" width="300" style="border: none;"/>
     </td>
     <td style="padding: 10px; vertical-align: middle; font-size: 32px;">➡️</td>
     <td style="padding: 10px;">
-      <img src="data/generated/gifs/start_night_style.gif" width="400" style="border: none;"/>
+      <img src="data/generated/gifs/start_night_style.gif" width="300" style="border: none;"/>
     </td>
   </tr>
 </table>
@@ -124,11 +124,11 @@ Visualize the features learned by specific layers of the network.
 <table align="center" style="border-collapse: collapse; text-align: center;">
   <tr>
     <td style="padding: 10px;">
-      <img src="data/generated/rainy_resized.jpg" width="400" style="border: none;"/>
+      <img src="data/generated/rainy_resized.jpg" width="300" style="border: none;"/>
     </td>
     <td style="padding: 10px; vertical-align: middle; font-size: 32px;">➡️</td>
     <td style="padding: 10px;">
-      <img src="data/generated/gifs/features.gif" width="400" style="border: none;"/>
+      <img src="data/generated/gifs/features.gif" width="300" style="border: none;"/>
     </td>
   </tr>
 </table>
@@ -158,26 +158,26 @@ python run.py nst --content_image data/contents/content.jpg --style_image data/s
   <!-- Row 1 -->
   <tr>
     <td style="padding: 10px;">
-      <img src="data/content/figures.jpg" width="400" height="150" style="border: none;"/>
+      <img src="data/content/figures.jpg" width="300" height="150" style="border: none;"/>
     </td>
     <td style="padding: 10px;">
-      <img src="data/style/wave_crop.jpg" width="400" style="border: none;"/>
+      <img src="data/style/wave_crop.jpg" width="300" style="border: none;"/>
     </td>
     <td style="padding: 10px;">
-      <img src="data/generated/gifs/figures_wave.gif" width="400" style="border: none;"/>
+      <img src="data/generated/gifs/figures_wave.gif" width="300" style="border: none;"/>
     </td>
   </tr>
 
   <!-- Row 2 -->
   <tr>
     <td style="padding: 10px;">
-      <img src="data/content/firy_resized.jpg" width="400" style="border: none;"/>
+      <img src="data/content/firy_resized.jpg" width="300" style="border: none;"/>
     </td>
     <td style="padding: 10px;">
-      <img src="data/style/giger_crop.jpg" width="400" style="border: none;"/>
+      <img src="data/style/giger_crop.jpg" width="300" style="border: none;"/>
     </td>
     <td style="padding: 10px;">
-      <img src="data/generated/meytal_man.gif" width="400" style="border: none;"/>
+      <img src="data/generated/meytal_man.gif" width="300" style="border: none;"/>
     </td>
   </tr>
 </table>

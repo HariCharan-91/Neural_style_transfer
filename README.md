@@ -75,13 +75,18 @@ python run.py <mode> [options]
 
 Reconstruct the content features from a specific layer of the network.
 
-<table align="center">
+<table align="center" style="border-collapse: collapse; text-align: center;">
   <tr>
-    <td><img src="data/content/firy_resized.jpg" width="200"/></td>
-    <td align="center" style="vertical-align: middle; font-size: 32px;">➡️</td>
-    <td><img src="data/generated/gifs/firy_content_layer10.gif" width="200"/></td>
+    <td style="padding: 10px;">
+      <img src="data/content/firy_resized.jpg" width="200" style="border: none;" />
+    </td>
+    <td style="padding: 10px; vertical-align: middle; font-size: 32px;">➡️</td>
+    <td style="padding: 10px;">
+      <img src="data/generated/gifs/firy_content_layer10.gif" width="200" style="border: none;" />
+    </td>
   </tr>
 </table>
+
 
 
 
@@ -94,13 +99,18 @@ python run.py content --content_image "data\content\firy.jpg" --target_layer 20 
 
 Reconstruct the style features from multiple layers of the network.
 
-<table align="center">
+<table align="center" style="border-collapse: collapse; text-align: center;">
   <tr>
-    <td><img src="data/generated/stary_night_resized.jpg" width="200"/></td>
-    <td align="center" style="vertical-align: middle; font-size: 32px;">➡️</td>
-    <td><img src="data/generated/gifs/start_night_style.gif" width="200"/></td>
+    <td style="padding: 10px;">
+      <img src="data/generated/stary_night_resized.jpg" width="200" style="border: none;"/>
+    </td>
+    <td style="padding: 10px; vertical-align: middle; font-size: 32px;">➡️</td>
+    <td style="padding: 10px;">
+      <img src="data/generated/gifs/start_night_style.gif" width="200" style="border: none;"/>
+    </td>
   </tr>
 </table>
+
 
 ```bash
 python run.py style --style_image data/styles/style.jpg --init_method noise --style_weight 1e3 --iterations 100 --lr 1 --optimizer lbfgs --tv_weight 1e-3 --noise_scale 0.1 
@@ -111,13 +121,18 @@ python run.py style --style_image data/styles/style.jpg --init_method noise --st
 
 Visualize the features learned by specific layers of the network.
 
-<table align="center">
+<table align="center" style="border-collapse: collapse; text-align: center;">
   <tr>
-    <td><img src="data/generated/rainy_resized.jpg" width="200"/></td>
-    <td align="center" style="vertical-align: middle; font-size: 32px;">➡️</td>
-    <td><img src="data/generated/gifs/features.gif" width="200"/></td>
+    <td style="padding: 10px;">
+      <img src="data/generated/rainy_resized.jpg" width="200" style="border: none;"/>
+    </td>
+    <td style="padding: 10px; vertical-align: middle; font-size: 32px;">➡️</td>
+    <td style="padding: 10px;">
+      <img src="data/generated/gifs/features.gif" width="200" style="border: none;"/>
+    </td>
   </tr>
 </table>
+
 
 ```bash
 python run.py visualize --image data\content\rain.jpg --target_layer 1
@@ -133,32 +148,40 @@ python run.py nst --content_image data/contents/content.jpg --style_image data/s
 ```
 ## Examples of NST:
 
-<table align="center">
-    <tr align="center">
-    <td>Content</td>
-    <td>Style</td>
-    <td>NST (content initialized)</td>
+<table align="center" style="border-collapse: collapse; text-align: center;">
+  <tr>
+    <th style="padding: 10px;">Content</th>
+    <th style="padding: 10px;">Style</th>
+    <th style="padding: 10px;">NST (content initialized)</th>
   </tr>
+
   <!-- Row 1 -->
   <tr>
-    <td><img src="data\content\figures.jpg" width="200" height = "150" /></td>
-    <td><img src="data\style\wave_crop.jpg" width="200"/></td>
-    <td><img src="data\generated\gifs\figures_wave.gif" width="200"/></td>
+    <td style="padding: 10px;">
+      <img src="data/content/figures.jpg" width="200" height="150" style="border: none;"/>
+    </td>
+    <td style="padding: 10px;">
+      <img src="data/style/wave_crop.jpg" width="200" style="border: none;"/>
+    </td>
+    <td style="padding: 10px;">
+      <img src="data/generated/gifs/figures_wave.gif" width="200" style="border: none;"/>
+    </td>
   </tr>
 
   <!-- Row 2 -->
-  <!-- <tr align="center">
-    <td>Content 2</td>
-    <td>Style 2</td>
-    <td>Stylized 2</td>
-  </tr> -->
   <tr>
-    <td><img src="data/content/firy_resized.jpg" width="200"/></td>
-    <td><img src="data\style\giger_crop.jpg" width="200"/></td>
-    <td><img src="data/generated/meytal_man.gif" width="200"/></td>
+    <td style="padding: 10px;">
+      <img src="data/content/firy_resized.jpg" width="200" style="border: none;"/>
+    </td>
+    <td style="padding: 10px;">
+      <img src="data/style/giger_crop.jpg" width="200" style="border: none;"/>
+    </td>
+    <td style="padding: 10px;">
+      <img src="data/generated/meytal_man.gif" width="200" style="border: none;"/>
+    </td>
   </tr>
-
 </table>
+
 
 ## Acknowledgements
 
